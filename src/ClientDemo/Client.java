@@ -27,16 +27,19 @@ public class Client extends PictureOperation{
         Mat img = new Mat();
         try {
             while(true) {
-                byte[] bytes = new byte[1024];
+                byte[] bytes = new byte[1024 * 100];
                 int length = 0;
                 int progress = 0;
 
-                //DataInputStream initialize
+                //输入端口初始化
                 System.out.println("接收数据中...");
-                length = 0;
-                progress = 0;
                 dataInputStream = new DataInputStream(socket.getInputStream());
+
+                //创建jpg文件
                 fileOutputStream = new FileOutputStream(new File("D:/TransportTest/Client.jpg"));
+
+                //输出端口初始化, 向Server发送是否接收完成的信号, 否两者速率不一致会报错
+                dataOutputStream = new DataOutputStream(socket.getOutputStream());
 
                 //接受图片的数据
                 while ((length = dataInputStream.read(bytes, 0, bytes.length)) != -1) {
@@ -45,14 +48,14 @@ public class Client extends PictureOperation{
                     fileOutputStream.write(bytes, 0, length);
                     fileOutputStream.flush();
 
-                    //数据传输最后一次很有可能是小于1024字节的, 所以以此作为一张图片的标志
-                    //imshow显示图片
-
-                    if(length < 1024){
+                    //一帧图片传输完成
+                    if((bytes[length - 2] == -1 && bytes[length - 1] == -39) || progress > 102400){
                         try {
                             img = Imgcodecs.imread("D:/TransportTest/Client.jpg");
-                            HighGui.imshow("Video", img);
-                            HighGui.waitKey(10);
+                            if(!img.empty()) {
+                                HighGui.imshow("Video", img);
+                                HighGui.waitKey(5);
+                            }else System.out.println("Empty picture!");
                         }catch(Exception err){
                             System.out.println("empty!!!!!!");
                         }
@@ -61,6 +64,7 @@ public class Client extends PictureOperation{
                         fileOutputStream = new FileOutputStream(new File("D:/TransportTest/Client.jpg"));
                         progress = 0;
                     }
+
                 }
             }
         }catch(IOException err){

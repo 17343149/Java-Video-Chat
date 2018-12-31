@@ -6,6 +6,7 @@ import org.opencv.core.Mat;
 import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.videoio.VideoCapture;
+import java.lang.String;
 
 import java.io.*;
 import java.net.*;
@@ -40,7 +41,6 @@ public class Server extends PictureOperation{
      */
     public void writeSocket(){
         try {
-
             /**
              * 先打开摄像头, 捕获一帧, 写入硬盘, 传输
              */
@@ -54,7 +54,7 @@ public class Server extends PictureOperation{
             Mat img = new Mat();
 
             /**
-             * opencv捕获一帧, 然后存入硬盘, 再传输
+             * opencv捕获一帧, 然后存入硬盘, 再传输, 循环
              */
             while (true) {
                 //opencv捕获一帧
@@ -70,26 +70,21 @@ public class Server extends PictureOperation{
                 fileInputStream = new FileInputStream(file);
                 dataOutputStream = new DataOutputStream(socket.getOutputStream());
 
-                byte[] bytes = new byte[1024];
+                //socket输入端口初始化(主要用来确定对方是否收到了信息, 然后再进行下一条信息的传送, 否则两者速率不一致会报错)
+                dataInputStream = new DataInputStream(socket.getInputStream());
+
+                byte[] bytes = new byte[1024 * 100];
                 int length = 0;
                 int progress = 0;
 
                 /**
-                 * transport jpg picture
+                 * 传输jpg图片, 每次传输1KB.
                  */
                 while ((length = fileInputStream.read(bytes, 0, bytes.length)) != -1) {
                     dataOutputStream.write(bytes, 0, length);
                     dataOutputStream.flush();
                     progress += length;
                     System.out.println(progress);
-
-                    System.out.println("begin!!!");
-                    System.out.println(bytes[bytes.length - 5]);
-                    System.out.println(bytes[bytes.length - 4]);
-                    System.out.println(bytes[bytes.length - 3]);
-                    System.out.println(bytes[bytes.length - 2]);
-                    System.out.println(bytes[bytes.length - 1]);
-                    System.out.println("end!!!");
                 }
                 System.out.println("Transport picture successful!");
             }

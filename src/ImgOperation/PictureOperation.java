@@ -22,6 +22,8 @@ public class PictureOperation extends Thread{
 
     public Mat img = null;
 
+    public int flag = 0;
+
     public void openVideo() {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
