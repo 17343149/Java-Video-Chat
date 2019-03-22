@@ -3,13 +3,12 @@ package ClientDemo;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.highgui.HighGui;
-import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
 
 import java.io.*;
 import java.net.*;
 
-public class Client extends Thread{
+public class Client2 extends Thread{
     private Socket socket = null;
     private FileOutputStream fileOutputStream = null;
     private FileInputStream fileInputStream = null;
@@ -23,8 +22,8 @@ public class Client extends Thread{
 
     private boolean flag = false;
 
-    private String writePath = "D:/VideoChat/test.jpg";
-    private String readPath = "D:/VideoChat/Client.jpg";
+    private String writePath = "D:/Test/test.jpg";
+    private String readPath = "D:/TransportTest/Client.jpg";
 
     private byte[] bytes = new byte[1024 * 100];
     private byte[] receiveBytes = new byte[1024 * 100];
@@ -34,9 +33,9 @@ public class Client extends Thread{
     /**
      * 初始化客户端, 连接上服务器的一个端口
      */
-    public Client(){
+    public Client2(){
         port = 1056;
-        host = "192.168.199.128";//******树莓派(服务器)的IP地址, 需要测试请自行更改
+        host = "127.0.0.1";
         try{
             socket = new Socket(host, port);
             System.out.println("Client initialize success! port: " + port);
@@ -46,9 +45,9 @@ public class Client extends Thread{
         }
     }
 
-    public Client(int temp){
+    public Client2(int temp){
         port = temp;
-        host = "192.168.199.128";//******树莓派(服务器)的IP地址, 需要测试请自行更改
+        host = "127.0.0.1";
         try{
             socket = new Socket(host, port);
             System.out.println("Client initialize success! port: " + port);
@@ -109,12 +108,24 @@ public class Client extends Thread{
             img = new Mat();
 
             /**
+             * 自己的摄像头为一个单独的线程
+             */
+            new Thread(){
+                public void run(){
+                    Mat myImg = new Mat();
+                    while(true) {
+                        myVideo.read(myImg);
+                        Imgcodecs.imwrite(writePath, myImg);
+                        HighGui.imshow("MyVideo", myImg);
+                        HighGui.waitKey(5);
+                    }
+                }
+            }.start();
+
+            /**
              * opencv捕获一帧, 存入硬盘, 传输, 接收服务器发送的图片, 显示
              */
             while (true) {
-                myVideo.read(img);
-                Imgproc.resize(img, img, new Size(img.cols() / 2, img.rows() / 2), 0, 0, Imgproc.INTER_AREA);
-                Imgcodecs.imwrite(writePath, img);
                 //File初始化
                 File file = new File(writePath);
                 if (!file.exists())
@@ -158,7 +169,6 @@ public class Client extends Thread{
                         try{
                             img = Imgcodecs.imread(readPath);
                             if(!img.empty()){
-                                Imgproc.resize(img, img, new Size(img.cols() * 2, img.rows() * 2), 0, 0, Imgproc.INTER_AREA);
                                 HighGui.imshow("Video", img);
                                 HighGui.waitKey(5);
                             }else System.out.println("Img empty!");
@@ -193,7 +203,7 @@ public class Client extends Thread{
     }
 
     public static void main(String[]args){
-        Client myClient= new Client();
+        Client2 myClient= new Client2(1057);
         myClient.start();
     }
 }
