@@ -1,33 +1,55 @@
 package ServerDemo;
 
-import ImgOperation.PictureOperation;
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.highgui.HighGui;
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.videoio.VideoCapture;
 import java.lang.String;
 
 import java.io.*;
 import java.net.*;
 
+/**
+ * 服务器的功能是接收从一个客户端发送过来的的数据, 然后转发给另一个客户端.
+ */
 
-public class Server extends PictureOperation{
+public class Server extends Thread{
+    private int port1;
+    private int port2;
+
+    private ServerSocket serverSocket1;
+    private ServerSocket serverSocket2;
+
+    private Socket socket1;
+    private Socket socket2;
+
+    private DataInputStream dataInputStream = null;
+    private DataOutputStream dataOutputStream = null;
+    private int linkedNumber = 0;
+
     /**
      * Server construct
      * @No param
      */
     public Server(){
+        port1 = 1056;
+        port2 = 1057;
         try{
-            /**
-             * ServerSocket initialize
-             */
-            serverSocket = new ServerSocket(1056);
-            System.out.println("ServerSocket initialize...");
-            System.out.println("Listening...");
+            System.out.println("等待客户端1(端口: " + port1 + ") 和客户端2(端口: " + port2 + ") 的连接.");
+            serverSocket1 = new ServerSocket(port1);
+            serverSocket2 = new ServerSocket(port2);
+            initializePort();
+        }catch (IOException err){
+            System.out.println("Server error! [1]");
+        }catch(Exception err){
+            System.out.println("Server error! [2]");
+        }
+    }
 
-            socket = serverSocket.accept();
-            System.out.println("Connect to Client!");
+    public Server(int count1, int count2){
+        port1 = count1;
+        port2 = count2;
+        try{
+            System.out.println("等待客户端1(端口: " + port1 + ") 和客户端2(端口: " + port2 + ") 的连接.");
+            serverSocket1 = new ServerSocket(port1);
+            serverSocket2 = new ServerSocket(port2);
+            initializePort();
         }catch (IOException err){
             System.out.println("Server error! [1]");
         }catch(Exception err){
@@ -36,73 +58,108 @@ public class Server extends PictureOperation{
     }
 
     /**
-     * Server transport picture
-     * @No param
+     * 分配两个线程初始化端口
      */
-    public void writeSocket(){
-        try {
-            /**
-             * 先打开摄像头, 捕获一帧, 写入硬盘, 传输
-             */
-            System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-            VideoCapture myVideo = new VideoCapture();
-            myVideo.open(0);
-            if (!myVideo.isOpened()) {
-                System.out.println("Open video failed!");
-                return;
+    public void initializePort(){
+        new Thread(){
+            public void run(){
+                try {
+                    socket1 = serverSocket1.accept();
+                    System.out.println("客户端1 " + port1 + " 连接成功!");
+                    linkedNumber++;
+                }catch(IOException err){}
             }
-            Mat img = new Mat();
+        }.start();
 
-            /**
-             * opencv捕获一帧, 然后存入硬盘, 再传输, 循环
-             */
-            while (true) {
-                //opencv捕获一帧
-                myVideo.read(img);
-                Imgcodecs.imwrite("D:/Test/test.jpg", img);
+        new Thread(){
+            public void run(){
+                try {
+                    socket2 = serverSocket2.accept();
+                    System.out.println("客户端2 " + port2 + " 连接成功!");
+                    linkedNumber++;
+                }catch(IOException err){}
+            }
+        }.start();
+    }
 
-                //File初始化
-                File file = new File("D:/Test/test.jpg");
-                if (!file.exists())
-                    return;
+    /**
+     * 测试端口是否被占用
+     * @param port
+     * @return
+     */
+    public boolean isPortAvailable(int port){
+        ServerSocket test = null;
+        try{
+            test = new ServerSocket(port);
+        }catch(IOException err){
+            return false;
+        }
+        if(test != null)
+            try {
+                test.close();
+            }catch(IOException err){}
+        return true;
 
-                //socket输出端口初始化
-                fileInputStream = new FileInputStream(file);
-                dataOutputStream = new DataOutputStream(socket.getOutputStream());
+    }
 
-                //socket输入端口初始化(主要用来确定对方是否收到了信息, 然后再进行下一条信息的传送, 否则两者速率不一致会报错)
-                dataInputStream = new DataInputStream(socket.getInputStream());
+    /**
+     * 接收并传输字节
+     */
+    public void receiveAndTransportDate(){
+        int choice = 1;
+        while(true) {
+            if (choice == 1) {
+                try {
+                    dataInputStream = new DataInputStream(socket1.getInputStream());
+                    dataOutputStream = new DataOutputStream(socket2.getOutputStream());
+                    System.out.println("Initialize choice1.");
+                } catch (IOException err) {
+                    System.out.println("Server receive data failed!");
+                    err.printStackTrace();
+                }
+            }else {
+                try {
+                    dataInputStream = new DataInputStream(socket2.getInputStream());
+                    dataOutputStream = new DataOutputStream(socket1.getOutputStream());
+                    System.out.println("Initialize choice2.");
+                } catch (IOException err) {
+                    System.out.println("Server receive data failed!");
+                    err.printStackTrace();
+                }
+            }
+            if (++choice > 2)
+                choice = 1;
+            int length = 0;
+            int progress = 0;
 
+            try {
+                System.out.println("Serversocket ready to receive bytes!");
                 byte[] bytes = new byte[1024 * 100];
-                int length = 0;
-                int progress = 0;
 
-                /**
-                 * 传输jpg图片, 每次传输1KB.
-                 */
-                while ((length = fileInputStream.read(bytes, 0, bytes.length)) != -1) {
+                //read会造成线程阻塞
+                while ((length = dataInputStream.read(bytes, 0, bytes.length)) != -1) {
+                    progress += length;
+                    System.out.println("Serversocket totally received " + progress + "bytes!");
                     dataOutputStream.write(bytes, 0, length);
                     dataOutputStream.flush();
-                    progress += length;
-                    System.out.println(progress);
+                    if(length <= 2 || (bytes[length - 2] == -1 && bytes[length - 1] == -39))
+                        break;
                 }
-                System.out.println("Transport picture successful!");
+            } catch (IOException err) {
+                System.out.println("Server transport bytes failed!");
+                err.printStackTrace();
+            }catch (Exception err){
+                System.out.println("Server timeout!");
             }
-        }catch(IOException err){
-            System.out.println("Server transport img failed! [1]");
-            err.printStackTrace();
-        }catch(Exception err){
-            System.out.println("Server transport img failed! [2]");
-            err.printStackTrace();
         }
     }
 
     /**
-     * Threan run()
-     * @No param
+     * Thread run()
      */
     public void run(){
-        writeSocket();
+        while(linkedNumber < 2){}
+        receiveAndTransportDate();
     }
 
     public static void main(String[]args){
